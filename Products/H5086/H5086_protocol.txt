@@ -2,34 +2,31 @@
 
 Data is transmitted big-endian
 
-ee1900f8f7004088305400f400500c44000000b8
+DATA: ee1900f8f7004088305400f400500c44000000b8
 
-ee19 > command				[0:4]
-00f8 > ?				[4:8]
-f700 > ?				[8:12]
-4088 > dec/10000 = 1.6520 kWh		[12:16]
-3054 > dec/100 = 123.72 V		[16:20]
-00f4 > dec/100 = 2.44 A			[20:24]
-00   > ?				[24:26]
-500c > dec/100 = 204.92 W		[26:30]
-44   > ?				[30:32]
-0000 > ?				[32:36]
-00b8 > checksum XOR of all bytes	[36:40]
+ee19   > command			[0:4]
+00f8f7 > secs on = 63735 (17:42:45)	[4:10]
+004088 > dec/10000 = 1.6520 kWh		[10:16]
+3054   > dec/100 = 123.72 V		[16:20]
+00f4   > dec/100 = 2.44 A		[20:24]
+00500c > dec/100 = 204.92 W		[24:30]
+44     > dec (%) = 68%			[30:32]
+000000 > padding			[32:37]
+b8     > checksum XOR of all bytes	[37:40]
 
-ee1900f8e800407f305400f800502d430000007a
+DATA: ee1900f8e800407f305400f800502d430000007a
 
-ee19 > command
-00f8 > ?
-e800 > ?
-407f > dec/10000 = 1.6511 kWh
-3054 > dec/100 = 123.72 V
-00f8 > dec/100 = 2.48
-00   >
-502d > dec/100 = 205.25 W
-43   > ?
-0000 > ?
-007a > checksum XOR of all bytes
+ee19   > command
+00f8e8 > secs on = 63720 (17:42:30)
+00407f > dec/10000 = 1.6511 kWh
+3054   > dec/100 = 123.72 V
+00f8   > dec/100 = 2.48
+00502d > dec/100 = 205.25 W
+43     > dec */%) = 67%
+000000 > padding
+7a     > checksum XOR of all bytes
 
+https://github.com/virtuald/Govee-Reverse-Engineering/blob/master/Products/H5086.md
 https://raw.githubusercontent.com/hbldh/bleak/refs/heads/master/examples/service_explorer.py
 
 aa000000000000000000000000000000000000aa
