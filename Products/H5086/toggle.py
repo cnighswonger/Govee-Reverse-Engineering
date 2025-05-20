@@ -5,6 +5,7 @@ import time
 from bleak import BleakClient
 from utils import find_device, compute_xor, SEND_CHARACTERISTIC_UUID, RECV_CHARACTERISTIC_UUID
 from pprint import pprint
+import codecs
 
 ## Configuration
 DEVICE_NAME = "GVH508668B9"  # the name of the device we want to pair with
@@ -12,9 +13,11 @@ AUTH_KEY = "5d0f273ef04b9f4f"  # Obtain this using pair.py
 
 MSG_TURN_ON = "3301ff00000000000000000000000000000000cd"
 MSG_TURN_OFF = "3301f000000000000000000000000000000000c2"
-MSG_SND_PWR_DATA = "aa000000000000000000000000000000000000aa"
 
-READ_DATA_UUID = "000102030405060708090a0b0c0d2b10"
+commands = {
+  'MSG_SND_PWR_DATA'  : "aa000000000000000000000000000000000000aa",
+  'MSG_GET_FWARE_VER' : "aa060000000000000000000000000000000000ac"
+}
 
 logging.basicConfig(
         level=logging.INFO,
@@ -46,13 +49,19 @@ async def main():
     
     # events to control execution flow
     on_auth_ready = asyncio.Event()
-    on_get_power_data_ready = asyncio.Event()
 
     async def handle_notification(c, data):
+      logger.debug(f"Raw data: {data}")
       if data[0] == 0x33 and data[1] == 0xB2:
         on_auth_ready.set()
+      elif (data.hex()[0:4] == "aa06"):
+        fwver = codecs.decode(data.hex()[4:18], "hex").decode('utf-8')
+        logger.info(f"Firmware version: {fwver}")
+        on_get_data_ready.set()
       elif (data.hex()[0:4] != "ee19"):
-        logger.info(f"Discarding packet.")
+        # It appears that commands which return data are echoed prior to the data being sent. -CN
+        cmd = data.hex()[0:4]
+        logger.info(f"Discarding packet: {cmd}")
       else:
         powerData = {
           "raw"         : data.hex(),
@@ -67,15 +76,19 @@ async def main():
         }
         logger.info(f"Current power data:")
         pprint(powerData, indent=4, sort_dicts=False)
-        on_get_power_data_ready.set()
+        on_get_data_ready.set()
 
     await client.start_notify(RECV_CHARACTERISTIC_UUID, handle_notification)
     
     await authenticate(client, AUTH_KEY)
     await on_auth_ready.wait()
 
-    await get_power_data(client)
-    await on_get_power_data_ready.wait()
+    # Loop through the commands and execute each one.
+    for key, value in commands.items():
+      on_get_data_ready = asyncio.Event()
+      logger.info(f"Executing {key}.")
+      await get_data(client, value)
+      await on_get_data_ready.wait()
 
     await client.stop_notify(RECV_CHARACTERISTIC_UUID)
     logger.info("Finished")
@@ -106,12 +119,12 @@ async def set_state(client, new_state):
   logger.debug(f"SEND {ba.hex()}")
   await client.write_gatt_char(SEND_CHARACTERISTIC_UUID, ba)
 
-async def get_power_data(client):
-  logger.info(f"Retrieving power data.")
-  # Send the command to retrieve the current power data
-  ba = bytearray.fromhex(MSG_SND_PWR_DATA)
+async def get_data(c, cmd):
+  logger.info(f"Retrieving data.")
+  # Send the command
+  ba = bytearray.fromhex(cmd)
   logger.debug(f"SEND {ba.hex()}")
-  await client.write_gatt_char(SEND_CHARACTERISTIC_UUID, ba)
-  logger.info(f"Done retrieving power data.")
+  await c.write_gatt_char(SEND_CHARACTERISTIC_UUID, ba)
+  logger.info(f"Done retrieving data.")
 
 asyncio.run(main())
