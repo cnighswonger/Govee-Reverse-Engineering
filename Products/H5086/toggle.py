@@ -46,14 +46,6 @@ async def main():
     # events to control execution flow
     on_auth_ready = asyncio.Event()
     on_get_power_data_ready = asyncio.Event()
-    #on_set_state_ready = asyncio.Event()
-
-#    async def recv_handler(c, data):
-#      logger.debug(f"RECV {data.hex()}")
-#      if data[0] == 0x33 and data[1] == 0xB2:
-#        on_auth_ready.set()
-#      elif data[0] == 0x33 and data[1] == 0x01:
-#        on_set_state_ready.set()
 
     async def handle_notification(c, data):
       if data[0] == 0x33 and data[1] == 0xB2:
@@ -80,7 +72,6 @@ async def main():
         print(f"Power Factor: \t\t{PF}%\r\n")
         on_get_power_data_ready.set()
 
-    #await client.start_notify(RECV_CHARACTERISTIC_UUID, recv_handler)
     await client.start_notify(RECV_CHARACTERISTIC_UUID, handle_notification)
     
     await authenticate(client, AUTH_KEY)
@@ -88,10 +79,6 @@ async def main():
 
     await get_power_data(client)
     await on_get_power_data_ready.wait()
-
-    #await set_state(client, not is_on)
-    #await on_set_state_ready.wait()
-    #await on_set_state_ready.wait()
 
     await client.stop_notify(RECV_CHARACTERISTIC_UUID)
     logger.info("Finished")
