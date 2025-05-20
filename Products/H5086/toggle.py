@@ -16,7 +16,8 @@ MSG_TURN_OFF = "3301f000000000000000000000000000000000c2"
 
 commands = {
   'MSG_SND_PWR_DATA'  : "aa000000000000000000000000000000000000aa",
-  'MSG_GET_FWARE_VER' : "aa060000000000000000000000000000000000ac"
+  'MSG_GET_FWARE_VER' : "aa060000000000000000000000000000000000ac",
+  'MSG_GET_HWARE_VER' : "aa070300000000000000000000000000000000ae"
 }
 
 logging.basicConfig(
@@ -57,6 +58,10 @@ async def main():
       elif (data.hex()[0:4] == "aa06"):
         fwver = codecs.decode(data.hex()[4:18], "hex").decode('utf-8')
         logger.info(f"Firmware version: {fwver}")
+        on_get_data_ready.set()
+      elif (data.hex()[0:4] == "aa07"):
+        hwver = codecs.decode(data.hex()[6:20], "hex").decode('utf-8')
+        logger.info(f"Hardware version: {hwver}")
         on_get_data_ready.set()
       elif (data.hex()[0:4] != "ee19"):
         # It appears that commands which return data are echoed prior to the data being sent. -CN
@@ -99,7 +104,7 @@ async def main():
 def get_adv_on_state(adv_data):
     for mfr_id, mfr_data in adv_data.manufacturer_data.items():
       #data = mfr_data.decode()
-      logger.info(f"Data: {mfr_data}")
+      logger.debug(f"Data: {mfr_data}")
       # The next to last byte in the manufacturer data is the state of the switch
       return mfr_data[-2] == 0x01
     return None
