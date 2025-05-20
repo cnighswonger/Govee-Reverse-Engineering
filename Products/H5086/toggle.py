@@ -11,7 +11,9 @@ AUTH_KEY = "5d0f273ef04b9f4f"  # Obtain this using pair.py
 
 MSG_TURN_ON = "3301ff00000000000000000000000000000000cd"
 MSG_TURN_OFF = "3301f000000000000000000000000000000000c2"
+MSG_SND_PWR_DATA = "aa000000000000000000000000000000000000aa"
 
+READ_DATA_UUID = "000102030405060708090a0b0c0d2b10"
 
 logging.basicConfig(
         level=logging.INFO,
@@ -43,21 +45,52 @@ async def main():
     
     # events to control execution flow
     on_auth_ready = asyncio.Event()
+    on_get_power_data_ready = asyncio.Event()
     #on_set_state_ready = asyncio.Event()
 
-    async def recv_handler(c, data):
-      logger.debug(f"RECV {data.hex()}")
+#    async def recv_handler(c, data):
+#      logger.debug(f"RECV {data.hex()}")
+#      if data[0] == 0x33 and data[1] == 0xB2:
+#        on_auth_ready.set()
+#      elif data[0] == 0x33 and data[1] == 0x01:
+#        on_set_state_ready.set()
+
+    async def handle_notification(c, data):
       if data[0] == 0x33 and data[1] == 0xB2:
         on_auth_ready.set()
-      elif data[0] == 0x33 and data[1] == 0x01:
-        on_set_state_ready.set()
+      elif (data.hex()[0:4] != "ee19"):
+        logger.info(f"Discarding packet.")
+      else:
+        print(f"\r\nRaw data:\t\t{data.hex()}")
+        ts  =  int(data.hex()[4:10],16)
+        kWh  =  int(data.hex()[10:16],16)/10000
+        V  =  int(data.hex()[16:20],16)/100
+        A  =  int(data.hex()[20:24],16)/100
+        W  =  int(data.hex()[26:30],16)/100
+        PF  =  int(data.hex()[30:32],16)
+        timestamp  =  time.time()
+        localTimeTuple  =  time.localtime(timestamp)
+        localTime  =  time.strftime("%H:%M:%S",  localTimeTuple)
+        print(f"Time of day:\t\t{localTime}")
+        print(f"Runtime:\t\t{ts} secs")
+        print(f"Daily kWh:\t\t{kWh}")
+        print(f"Volts:\t\t\t{V}")
+        print(f"Amps:\t\t\t{A}")
+        print(f"Watts:\t\t\t{W}")
+        print(f"Power Factor: \t\t{PF}%\r\n")
+        on_get_power_data_ready.set()
 
-    await client.start_notify(RECV_CHARACTERISTIC_UUID, recv_handler)
+    #await client.start_notify(RECV_CHARACTERISTIC_UUID, recv_handler)
+    await client.start_notify(RECV_CHARACTERISTIC_UUID, handle_notification)
     
     await authenticate(client, AUTH_KEY)
     await on_auth_ready.wait()
 
+    await get_power_data(client)
+    await on_get_power_data_ready.wait()
+
     #await set_state(client, not is_on)
+    #await on_set_state_ready.wait()
     #await on_set_state_ready.wait()
 
     await client.stop_notify(RECV_CHARACTERISTIC_UUID)
@@ -74,7 +107,6 @@ def get_adv_on_state(adv_data):
       return mfr_data[-2] == 0x01
     return None
 
-
 async def authenticate(client, auth_key):
   logger.info("Authenticating")
   # Create the message
@@ -83,7 +115,6 @@ async def authenticate(client, auth_key):
   logger.debug(f"SEND {ba.hex()}")
   await client.write_gatt_char(SEND_CHARACTERISTIC_UUID, ba)
 
-
 async def set_state(client, new_state):
   logger.info(f"Updating state to: {new_state}")
   # Send the set on or off command
@@ -91,6 +122,12 @@ async def set_state(client, new_state):
   logger.debug(f"SEND {ba.hex()}")
   await client.write_gatt_char(SEND_CHARACTERISTIC_UUID, ba)
 
-    
+async def get_power_data(client):
+  logger.info(f"Retrieving power data.")
+  # Send the command to retrieve the current power data
+  ba = bytearray.fromhex(MSG_SND_PWR_DATA)
+  logger.debug(f"SEND {ba.hex()}")
+  await client.write_gatt_char(SEND_CHARACTERISTIC_UUID, ba)
+  logger.info(f"Done retrieving power data.")
 
 asyncio.run(main())

@@ -8,7 +8,7 @@ logging.basicConfig(
         format="%(asctime)-15s %(levelname)s: %(message)s",
     )
 logger = logging.getLogger(__name__)
-#logger.level = logging.DEBUG
+logger.level = logging.DEBUG
 
 async def main():
     stop_event = asyncio.Event()
