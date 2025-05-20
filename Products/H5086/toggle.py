@@ -4,6 +4,7 @@ import logging
 import time
 from bleak import BleakClient
 from utils import find_device, compute_xor, SEND_CHARACTERISTIC_UUID, RECV_CHARACTERISTIC_UUID
+from pprint import pprint
 
 ## Configuration
 DEVICE_NAME = "GVH508668B9"  # the name of the device we want to pair with
@@ -25,7 +26,7 @@ logger = logging.getLogger(__name__)
 async def main():
   logger.info(f"Searching for device {DEVICE_NAME}")
   device, adv_data = await find_device(DEVICE_NAME)
-  logger.info(f"Adv Data: {adv_data}")
+  #logger.info(f"Adv Data: {adv_data}")
   if device is None:
     logger.error(f"Could not find a device!")
     return
@@ -53,23 +54,19 @@ async def main():
       elif (data.hex()[0:4] != "ee19"):
         logger.info(f"Discarding packet.")
       else:
-        print(f"\r\nRaw data:\t\t{data.hex()}")
-        ts  =  int(data.hex()[4:10],16)
-        kWh  =  int(data.hex()[10:16],16)/10000
-        V  =  int(data.hex()[16:20],16)/100
-        A  =  int(data.hex()[20:24],16)/100
-        W  =  int(data.hex()[26:30],16)/100
-        PF  =  int(data.hex()[30:32],16)
-        timestamp  =  time.time()
-        localTimeTuple  =  time.localtime(timestamp)
-        localTime  =  time.strftime("%H:%M:%S",  localTimeTuple)
-        print(f"Time of day:\t\t{localTime}")
-        print(f"Runtime:\t\t{ts} secs")
-        print(f"Daily kWh:\t\t{kWh}")
-        print(f"Volts:\t\t\t{V}")
-        print(f"Amps:\t\t\t{A}")
-        print(f"Watts:\t\t\t{W}")
-        print(f"Power Factor: \t\t{PF}%\r\n")
+        powerData = {
+          "raw"         : data.hex(),
+          "timestamp"   : time.time(),
+          "localtime"   : time.strftime("%H:%M:%S", time.localtime(time.time())),
+          "runtime"     : int(data.hex()[4:10],16),
+          "kWh"         : int(data.hex()[10:16],16)/10000,
+          "volts"       : int(data.hex()[16:20],16)/100,
+          "amps"        : int(data.hex()[20:24],16)/100,
+          "watts"       : int(data.hex()[26:30],16)/100,
+          "powerfactor" : int(data.hex()[30:32],16)
+        }
+        logger.info(f"Current power data:")
+        pprint(powerData, indent=4, sort_dicts=False)
         on_get_power_data_ready.set()
 
     await client.start_notify(RECV_CHARACTERISTIC_UUID, handle_notification)
