@@ -6,6 +6,7 @@ from bleak import BleakClient
 from utils import find_device, compute_xor, SEND_CHARACTERISTIC_UUID, RECV_CHARACTERISTIC_UUID
 from pprint import pprint
 import codecs
+import sqlite3
 
 ## Configuration
 DEVICE_NAME = "GVH508668B9"  # the name of the device we want to pair with
@@ -30,6 +31,8 @@ logging.basicConfig(
     )
 logger = logging.getLogger(__name__)
 # logger.level = logging.DEBUG
+
+db = sqlite3.connect('H5086_CN.db')
 
 async def main():
   logger.info(f"Searching for device {DEVICE_NAME}")
@@ -66,18 +69,20 @@ async def main():
         logger.info(f"Discarding packet: {cmd}")
       else:
         powerData = {
-          "raw"         : data.hex(),
+          "mac"         : client.address,
           "timestamp"   : time.time(),
-          "localtime"   : time.strftime("%H:%M:%S", time.localtime(time.time())),
           "runtime"     : int(data.hex()[4:10],16),
-          "kWh"         : int(data.hex()[10:16],16)/10000,
-          "volts"       : int(data.hex()[16:20],16)/100,
-          "amps"        : int(data.hex()[20:24],16)/100,
-          "watts"       : int(data.hex()[26:30],16)/100,
-          "powerfactor" : int(data.hex()[30:32],16)
+          "kwh"         : int(data.hex()[10:16],16)/10000,
+          "e"           : int(data.hex()[16:20],16)/100,
+          "i"           : int(data.hex()[20:24],16)/100,
+          "p"           : int(data.hex()[26:30],16)/100,
+          "pf"          : int(data.hex()[30:32],16)
         }
         logger.info(f"Current power data:")
         pprint(powerData, indent=4, sort_dicts=False)
+        c = db.cursor()
+        c.execute('INSERT INTO data (mac, timestamp, runtime, kwh, e, i, p, pf) VALUES (:mac, :timestamp, :runtime, :kwh, :e, :i, :p, :pf);', powerData)
+        db.commit()
         on_get_data_ready.set()
 
     await client.start_notify(RECV_CHARACTERISTIC_UUID, handle_notification)
@@ -93,6 +98,14 @@ async def main():
       await on_get_data_ready.wait()
 
     await client.stop_notify(RECV_CHARACTERISTIC_UUID)
+
+    c = db.cursor()
+    c.execute('SELECT * FROM data;')
+    r = c.fetchall()
+    for row in r:
+        print(row)
+    db.close()
+
     logger.info("Finished")
 
 async def authenticate(client, auth_key):
